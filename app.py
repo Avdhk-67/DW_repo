@@ -8,14 +8,19 @@ app = Flask(__name__)
 @app.route('/convert', methods=['POST'])
 def convert():
     try:
-        # Try reading as raw binary first
-        file_bytes = request.data
-        if not file_bytes:
-            # Try reading from JSON body as base64
-            data = request.get_json()
-            file_bytes = base64.b64decode(data['fileBase64'])
+        # Get raw bytes from request
+        file_bytes = request.get_data()
         
-        df = pd.read_parquet(io.BytesIO(file_bytes))
+        # If data comes as base64 encoded string
+        if file_bytes[:3] != b'PAR':
+            try:
+                file_bytes = base64.b64decode(file_bytes)
+            except Exception:
+                pass
+        
+        buf = io.BytesIO(file_bytes)
+        buf.seek(0)
+        df = pd.read_parquet(buf)
         df = df.where(pd.notnull(df), None)
         df = df.fillna("")
         return jsonify(df.to_dict(orient='records'))
